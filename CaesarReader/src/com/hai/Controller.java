@@ -247,11 +247,11 @@ public class Controller implements Initializable {
      */
     private void connect(String account, String password) {
         if ("".equals(account)) {
-            printLog("账号不能为空");
+            printLog("账号不能为空！");
             return;
         }
         if ("".equals(password)) {
-            printLog("密码不能为空");
+            printLog("密码不能为空！");
             return;
         }
         try {
@@ -270,17 +270,16 @@ public class Controller implements Initializable {
         try {
             printLog("3秒后开始拨号...");
             Thread.sleep(3000);
-            printLog("开始拨号");
+            printLog("开始拨号！");
             statusTxt.setText("正在拨号");
             boolean status = ADSLUtil.connectAdsl(account, password);
             if (status) {
-                printLog("拨号成功3秒后开始阅读");
+                printLog("拨号成功3秒后开始阅读！");
                 statusTxt.setText("拨号成功");
                 stopPPPOEFlag = false;
                 try {
                     ipTxt.setText(ADSLUtil.getIp());
                 } catch (Exception e1) {
-                    printLog("获取IP失败");
                     appendFile(rootPath + "\\error.log", e1.getMessage());
                 }
 
@@ -293,7 +292,7 @@ public class Controller implements Initializable {
                 statusTxt.setText("拨号失败");
             }
         } catch (Exception e) {
-            printLog("拨号异常");
+            printLog("拨号异常！");
             appendFile(rootPath + "\\error.log", e.getMessage());
         }
     }
@@ -305,16 +304,17 @@ public class Controller implements Initializable {
      */
     private void read(String url) {
         if (null == url || url.trim().equals("")) {
-            printLog("已全部阅读完成");
+            printLog("文章已全部阅读完成！");
             readingFlag = false;
             return;
         }
         readNum = readNum + 1;
-        printLog(String.format("开始阅读第 %s 篇，剩余 %s 篇", readNum, unReadNum));
-        printLog(String.format("当前文章：%s", url));
+        printLog(String.format("开始阅读第 %s 篇，剩余 %s 篇！", readNum, unReadNum));
+        printLog(String.format("正在加载文章：%s", url));
 
         driver = new ChromeDriver(service, chromeOptions);
         driver.get(url);
+        printLog("文章加载完成开始阅读！");
         //下滑次数
         int hasNum = 0;
         try {
@@ -326,7 +326,7 @@ public class Controller implements Initializable {
 
                 int holdTime = getRandomNumberInRange(pauseTimeFrom, pauseTimeTo);
                 int px = getRandomNumberInRange(pxFrom, pxTo);
-                printLog(String.format("第 %s 次下滑，等待 %s 秒, 下滑 %s 像素", i, holdTime, px));
+                printLog(String.format("第 %s 次下滑，等待 %s 秒, 下滑 %s 像素！", i, holdTime, px));
                 Thread.sleep(holdTime * 1000);
                 TouchScreen touchScreen = driver.getTouch();
                 touchScreen.scroll(0, px);
@@ -337,11 +337,11 @@ public class Controller implements Initializable {
         }
 
         if (stopReadFlag) {
-            printLog(String.format("第 %s 篇阅读未完成，共下滑 %s 次", readNum, hasNum));
+            printLog(String.format("第 %s 篇文章未阅读完成，共下滑 %s 次！", readNum, hasNum));
             //将该url重新写入未读文件
             appendFile(rootPath + "\\unread.txt", url);
         } else {
-            printLog(String.format("第 %s 篇阅读完成，共下滑 %s 次", readNum, hasNum));
+            printLog(String.format("第 %s 篇文章阅读完成，共下滑 %s 次！", readNum, hasNum));
             appendFile(rootPath + "\\read.txt", url);
         }
 
@@ -422,12 +422,12 @@ public class Controller implements Initializable {
             writer.write(content);
             writer.close();
         } catch (Exception e) {
-            printLog("保存失败!");
+            printLog("保存全局配置失败！");
             appendFile(rootPath + "\\error.log", e.getMessage());
             return;
         }
 
-        printLog("保存成功!");
+        printLog("保存全局配置成功！");
     }
 
     /**
@@ -442,7 +442,6 @@ public class Controller implements Initializable {
             writer.write(content + "\r\n");
             writer.close();
         } catch (Exception e) {
-            printLog("保存失败!");
             appendFile(rootPath + "\\error.log", e.getMessage());
         }
     }
@@ -476,7 +475,7 @@ public class Controller implements Initializable {
                 unReadNum = line - 1;
             }
         } catch (Exception e) {
-            printLog("文章读取失败");
+            printLog("获取文章失败！");
             appendFile(rootPath + "\\error.log", e.getMessage());
         }
 
