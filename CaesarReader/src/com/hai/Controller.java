@@ -153,7 +153,7 @@ public class Controller implements Initializable {
                     .build();
             service.start();
         } catch (Exception e) {
-            e.printStackTrace();
+            appendFile(rootPath + "\\error.log", e.getMessage());
         }
     }
 
@@ -201,7 +201,7 @@ public class Controller implements Initializable {
         }
         stopReadFlag = false;
         readingFlag = true;
-        CompletableFuture.runAsync(() -> read("https://www.baidu.com"));
+        CompletableFuture.runAsync(() -> read(readAndDeleteFirstLine(rootPath + "\\unread.txt")));
     }
 
     /**
@@ -235,6 +235,7 @@ public class Controller implements Initializable {
             printLog("连接已断开");
         } catch (Exception e) {
             printLog("断开连接失败!");
+            appendFile(rootPath + "\\error.log", e.getMessage());
             return;
         }
 
@@ -258,24 +259,30 @@ public class Controller implements Initializable {
             ADSLUtil.disconnectAdsl();
             printLog("连接已断开");
         } catch (Exception e) {
-            printLog("断开连接失败!");
+            printLog("断开连接失败!" + e.getMessage());
+            appendFile(rootPath + "\\error.log", e.getMessage());
             return;
         }
 
         try {
+            printLog("3秒后开始拨号...");
             Thread.sleep(3000);
+            printLog("开始拨号");
             statusTxt.setText("正在拨号");
             boolean status = ADSLUtil.connectAdsl(account, password);
             if (status) {
+                printLog("拨号成功3秒后开始阅读");
                 statusTxt.setText("拨号成功");
                 stopPPPOEFlag = false;
                 try {
                     ipTxt.setText(ADSLUtil.getIp());
                 } catch (Exception e1) {
                     printLog("获取IP失败");
+                    appendFile(rootPath + "\\error.log", e1.getMessage());
                 }
 
                 if (!stopReadFlag) {
+                    Thread.sleep(3000);
                     //触发开始阅读
                     Event.fireEvent(startReadBtn, new ActionEvent());
                 }
@@ -284,6 +291,7 @@ public class Controller implements Initializable {
             }
         } catch (Exception e) {
             printLog("拨号异常");
+            appendFile(rootPath + "\\error.log", e.getMessage());
         }
     }
 
@@ -295,6 +303,7 @@ public class Controller implements Initializable {
     private void read(String url) {
         if (null == url || url.trim().equals("")) {
             printLog("已全部阅读完成");
+            readingFlag = false;
             return;
         }
         readNum = readNum + 1;
@@ -321,11 +330,13 @@ public class Controller implements Initializable {
                 hasNum = i;
             }
         } catch (Exception e) {
-            printLog(e.getMessage());
+            appendFile(rootPath + "\\error.log", e.getMessage());
         }
 
         if (stopReadFlag) {
             printLog(String.format("第 %s 篇阅读未完成，共下滑 %s 次", readNum, hasNum));
+            //将该url重新写入未读文件
+            appendFile(rootPath + "\\unread.txt", url);
         } else {
             printLog(String.format("第 %s 篇阅读完成，共下滑 %s 次", readNum, hasNum));
             appendFile(rootPath + "\\read.txt", url);
@@ -335,6 +346,7 @@ public class Controller implements Initializable {
             driver.quit();
         }
 
+        readingFlag = false;
         //触发重新拨号
         if (!stopReadFlag) {
             Event.fireEvent(connectBtn, new ActionEvent());
@@ -389,34 +401,82 @@ public class Controller implements Initializable {
                 line = br.readLine();
             }
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            appendFile(rootPath + "\\error.log", e.getMessage());
         }
 
         return strArray;
     }
 
+    /**
+     * 写文件
+     *
+     * @param pathname
+     * @param content
+     */
     private void writeTextFile(String pathname, String content) {
         try {
             FileWriter writer = new FileWriter(pathname);
             writer.write(content);
             writer.close();
         } catch (Exception e) {
-            System.out.println(e.getMessage());
             printLog("保存失败!");
+            appendFile(rootPath + "\\error.log", e.getMessage());
             return;
         }
 
         printLog("保存成功!");
     }
 
+    /**
+     * 追加文件内容
+     *
+     * @param pathname
+     * @param content
+     */
     private void appendFile(String pathname, String content) {
         try {
             FileWriter writer = new FileWriter(pathname, true);
-            writer.write(content);
+            writer.write(content + "\r\n");
             writer.close();
         } catch (Exception e) {
-            System.out.println(e.getMessage());
             printLog("保存失败!");
+            appendFile(rootPath + "\\error.log", e.getMessage());
         }
+    }
+
+    /**
+     * 读取删除第一行
+     *
+     * @param pathname
+     * @return
+     */
+    private String readAndDeleteFirstLine(String pathname) {
+        String firstLine = null;
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(pathname));
+            StringBuilder sb = new StringBuilder(4096);
+            String temp;
+            int line = 0;
+            while ((temp = br.readLine()) != null) {
+                line++;
+                if (line == 1) {
+                    firstLine = temp;
+                    continue;
+                }
+                sb.append(temp).append("\r\n");
+            }
+            br.close();
+            BufferedWriter bw = new BufferedWriter(new FileWriter(pathname));
+            bw.write(sb.toString());
+            bw.close();
+            if (line > 0) {
+                unReadNum = line - 1;
+            }
+        } catch (Exception e) {
+            printLog("文章读取失败");
+            appendFile(rootPath + "\\error.log", e.getMessage());
+        }
+
+        return firstLine;
     }
 }

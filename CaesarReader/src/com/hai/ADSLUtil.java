@@ -23,7 +23,7 @@ public class ADSLUtil {
      * @throws Exception
      */
     private static String executeCmd(String strCmd) throws IOException, InterruptedException {
-        Process process = Runtime.getRuntime().exec("cmd /c " + strCmd);
+        Process process = Runtime.getRuntime().exec(strCmd);
         process.waitFor();
         StringBuilder sbCmd = new StringBuilder();
         BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()));
@@ -43,7 +43,7 @@ public class ADSLUtil {
      * @throws Exception
      */
     static boolean connectAdsl(String account, String password) throws Exception {
-        String connectCmd = "rasdial 宽带连接 " + account + " " + password;
+        String connectCmd = "rasdial.exe 宽带连接 " + account + " " + password;
         String tempCmd = executeCmd(connectCmd);
         // 判断是否连接成功  
         return tempCmd.indexOf("已连接") > 0;
@@ -56,7 +56,7 @@ public class ADSLUtil {
      * @throws Exception
      */
     static boolean disconnectAdsl() throws Exception {
-        String disconnectCmd = "rasdial 宽带连接 /disconnect";
+        String disconnectCmd = "rasdial.exe 宽带连接 /disconnect";
         String result = executeCmd(disconnectCmd);
         return !result.contains("没有连接");
     }
@@ -81,7 +81,7 @@ public class ADSLUtil {
      * @return
      * @throws SocketException
      */
-    public static String getIp() throws SocketException {
+    static String getIp() throws SocketException {
         String ip = null;
         Enumeration<NetworkInterface> netInterfaces = NetworkInterface.getNetworkInterfaces();
         while (netInterfaces.hasMoreElements()) {
