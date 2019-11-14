@@ -230,11 +230,11 @@ public class Controller implements Initializable {
      */
     public void disconnectButtonPress(ActionEvent event) {
         try {
-            printLog("正在断开连接");
+            printLog("手动断开宽带连接！");
             ADSLUtil.disconnectAdsl();
-            printLog("连接已断开");
+            printLog("宽带连接已断开！");
         } catch (Exception e) {
-            printLog("断开连接失败!");
+            printLog("断开宽带连接异常，系统退出！");
             appendFile(rootPath + "\\error.log", e.getMessage());
             return;
         }
@@ -255,14 +255,17 @@ public class Controller implements Initializable {
             return;
         }
         try {
-            printLog("重新断开连接");
+            printLog("正在断开宽带连接！");
             ADSLUtil.disconnectAdsl();
-            printLog("连接已断开");
+            printLog("宽带连接已断开！");
         } catch (Exception e) {
-            printLog("断开连接失败!" + e.getMessage());
+            printLog("断开宽带连接异常，系统退出！");
             appendFile(rootPath + "\\error.log", e.getMessage());
             return;
         }
+
+        statusTxt.setText("");
+        ipTxt.setText("");
 
         try {
             printLog("3秒后开始拨号...");
