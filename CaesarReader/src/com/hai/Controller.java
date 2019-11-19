@@ -1,5 +1,6 @@
 package com.hai;
 
+import com.google.common.collect.Lists;
 import javafx.event.ActionEvent;
 import javafx.event.Event;
 import javafx.fxml.FXML;
@@ -17,20 +18,25 @@ import java.io.*;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class Controller implements Initializable {
     private static ChromeDriverService service;
+    private static Map<String, Object> mobileEmulation;
     private static ChromeOptions chromeOptions;
     private static final String rootPath;
-    //    private static ExecutorService cachedExecutor;
+    private static ExecutorService executorService;
+    private static final List<String> userAgents;
+    private static List<String> urls;
+    private static int totalNum = 0;//总文章篇数
     private ChromeDriver driver;
     private boolean stopReadFlag = false;
     private boolean readingFlag = false;//正在阅读标识
     private boolean stopPPPOEFlag = false;
-    //已完成文章篇数
-    private int readNum = 0;
-    // 剩余文章篇数
-    private int unReadNum = 0;
+    //当前文章
+    private int currentNum = 0;
 
     private static Integer pauseTimeFrom;
     private static Integer pauseTimeTo;
@@ -82,6 +88,18 @@ public class Controller implements Initializable {
     private Text ipTxt;
 
     static {
+        userAgents = Lists.newArrayList(
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 6_1_3 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Mobile/10B329 MicroMessenger/5.0.1",
+                "Mozilla/5.0 (Linux; Android 7.1.1; MI 6 Build/NMF26X; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/57.0.2987.132 MQQBrowser/6.2 TBS/043807 Mobile Safari/537.36 MicroMessenger/6.6.1.1220(0x26060135) NetType/WIFI Language/zh_CN",
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 9_3_2 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Mobile/13F69 MicroMessenger/6.6.1 NetType/4G Language/zh_CN",
+                "Mozilla/5.0 (Linux; Android 7.1.1; OD103 Build/NMF26F; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/53.0.2785.49 Mobile MQQBrowser/6.2 TBS/043632 Safari/537.36 MicroMessenger/6.6.1.1220(0x26060135) NetType/4G Language/zh_CN",
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 11_2_2 like Mac OS X) AppleWebKit/604.4.7 (KHTML, like Gecko) Mobile/15C202 MicroMessenger/6.6.1 NetType/4G Language/zh_CN",
+                "Mozilla/5.0 (Linux; Android 6.0.1; SM919 Build/MXB48T; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/53.0.2785.49 Mobile MQQBrowser/6.2 TBS/043632 Safari/537.36 MicroMessenger/6.6.1.1220(0x26060135) NetType/WIFI Language/zh_CN",
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 11_1_1 like Mac OS X) AppleWebKit/604.3.5 (KHTML, like Gecko) Mobile/15B150 MicroMessenger/6.6.1 NetType/WIFI Language/zh_CN",
+                "Mozilla/5.0 (Linux; Android 5.1.1; vivo X6S A Build/LMY47V; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/53.0.2785.49 Mobile MQQBrowser/6.2 TBS/043632 Safari/537.36 MicroMessenger/6.6.1.1220(0x26060135) NetType/WIFI Language/zh_CN",
+                "Mozilla/5.0 (iphone x Build/MXB48T; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/53.0.2785.49 Mobile MQQBrowser/6.2 TBS/043632 Safari/537.36 MicroMessenger/6.6.1.1220(0x26060135) NetType/WIFI Language/zh_CN",
+                "Mozilla/5.0 (Linux; Android 5.1; HUAWEI TAG-AL00 Build/HUAWEITAG-AL00; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/53.0.2785.49 Mobile MQQBrowser/6.2 TBS/043622 Safari/537.36 MicroMessenger/6.6.1.1220(0x26060135) NetType/4G Language/zh_CN"
+        );
         chromeOptions = new ChromeOptions();
         List<String> arguments = new ArrayList<>();
         arguments.add("--window-size=360,640");
@@ -89,21 +107,21 @@ public class Controller implements Initializable {
         arguments.add("--hide-scrollbars");
         arguments.add("--disable-javascript");
         arguments.add("--disable-infobars");
+        arguments.add("--no-default-browser-check");
         chromeOptions.addArguments(arguments);
 
         Map<String, Object> deviceMetrics = new HashMap<>();
         deviceMetrics.put("width", 360);
         deviceMetrics.put("height", 640);
         deviceMetrics.put("pixelRatio", 3.0);
-
-        Map<String, Object> mobileEmulation = new HashMap<>();
+        mobileEmulation = new HashMap<>();
         mobileEmulation.put("deviceMetrics", deviceMetrics);
-        mobileEmulation.put("userAgent", "Mozilla/5.0 (Linux; Android 4.2.1; en-us; Nexus 5 Build/JOP40D) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19");
 
-        chromeOptions.setExperimentalOption("mobileEmulation", mobileEmulation);
         chromeOptions.setExperimentalOption("w3c", false);
 
         rootPath = new File(System.getProperty("user.dir")).getParent();
+
+        executorService = Executors.newFixedThreadPool(10);
     }
 
     @Override
@@ -114,6 +132,9 @@ public class Controller implements Initializable {
     }
 
     private void initConfig() {
+        urls = readFromTextFile(rootPath + "\\unread.txt");
+        totalNum = urls.size();
+
         List<String> configList = readFromTextFile(rootPath + "\\config.ini");
         if (null == configList || configList.size() == 0) {
             return;
@@ -130,6 +151,8 @@ public class Controller implements Initializable {
         pxFromTxt.setText(configs[6]);
         pxToTxt.setText(configs[7]);
         chromeLocationTxt.setText(configs[8]);
+        accountTxt.setText(configs[9]);
+        passwordTxt.setText(configs[10]);
 
         String s = configs[8].replace("\\", "\\\\");
         chromeOptions.setBinary(s);
@@ -172,6 +195,8 @@ public class Controller implements Initializable {
         String pxFromString = pxFromTxt.getText().trim();
         String pxToString = pxToTxt.getText().trim();
         String chromeLocationString = chromeLocationTxt.getText().trim();
+        String accountString = accountTxt.getText().trim();
+        String passwordString = passwordTxt.getText().trim();
         if (startTimeString.equals("") || endTimeString.equals("")
                 || pauseTimeFromString.equals("") || pauseTimeToString.equals("")
                 || slipTimesFromString.equals("") || slipTimesToString.equals("")
@@ -180,8 +205,19 @@ public class Controller implements Initializable {
             return;
         }
 
-        String configs = startTimeString + "|" + endTimeString + "|" + pauseTimeFromString + "|" + pauseTimeToString + "|" + slipTimesFromString + "|" + slipTimesToString + "|" + pxFromString + "|" + pxToString + "|" + chromeLocationString;
-        writeTextFile(rootPath + "\\config.ini", configs);
+        String builder = startTimeString + "|" +
+                endTimeString + "|" +
+                pauseTimeFromString + "|" +
+                pauseTimeToString + "|" +
+                slipTimesFromString + "|" +
+                slipTimesToString + "|" +
+                pxFromString + "|" +
+                pxToString + "|" +
+                chromeLocationString + "|" +
+                accountString + "|" +
+                passwordString;
+
+        writeTextFile(rootPath + "\\config.ini", builder);
         pauseTimeFrom = Integer.valueOf(pauseTimeFromString);
         pauseTimeTo = Integer.valueOf(pauseTimeToString);
         slipTimesFrom = Integer.valueOf(slipTimesFromString);
@@ -201,7 +237,7 @@ public class Controller implements Initializable {
         }
         stopReadFlag = false;
         readingFlag = true;
-        CompletableFuture.runAsync(() -> read(readAndDeleteFirstLine(rootPath + "\\unread.txt")));
+        CompletableFuture.runAsync(() -> read(urls.get(currentNum)), executorService);
     }
 
     /**
@@ -220,7 +256,7 @@ public class Controller implements Initializable {
      * @param event
      */
     public void connectButtonPress(ActionEvent event) {
-        CompletableFuture.runAsync(() -> connect(accountTxt.getText().trim(), passwordTxt.getText().trim()));
+        CompletableFuture.runAsync(() -> connect(accountTxt.getText().trim(), passwordTxt.getText().trim()), executorService);
     }
 
     /**
@@ -290,6 +326,7 @@ public class Controller implements Initializable {
                 }
             } else {
                 statusTxt.setText("拨号失败");
+                printLog("拨号失败，停止阅读！");
             }
         } catch (Exception e) {
             printLog("拨号异常！");
@@ -308,12 +345,18 @@ public class Controller implements Initializable {
             readingFlag = false;
             return;
         }
-        readNum = readNum + 1;
-        printLog(String.format("开始阅读第 %s 篇，剩余 %s 篇！", readNum, unReadNum));
+
+        printLog(String.format("开始阅读第 %s 篇，剩余 %s 篇！", currentNum + 1, totalNum - currentNum - 1));
         printLog(String.format("正在加载文章：%s", url));
 
+        //随机设置ua
+        mobileEmulation.put("userAgent", userAgents.get(getRandomNumberInRange(0, 9)));
+        chromeOptions.setExperimentalOption("mobileEmulation", mobileEmulation);
+
         driver = new ChromeDriver(service, chromeOptions);
+        driver.manage().timeouts().implicitlyWait(5, TimeUnit.SECONDS);
         driver.get(url);
+        driver.manage().timeouts().implicitlyWait(3, TimeUnit.SECONDS);
         printLog("文章加载完成开始阅读！");
         //下滑次数
         int hasNum = 0;
@@ -337,12 +380,14 @@ public class Controller implements Initializable {
         }
 
         if (stopReadFlag) {
-            printLog(String.format("第 %s 篇文章未阅读完成，共下滑 %s 次！", readNum, hasNum));
-            //将该url重新写入未读文件
-            appendFile(rootPath + "\\unread.txt", url);
+            printLog(String.format("第 %s 篇文章未完成！", currentNum + 1));
         } else {
-            printLog(String.format("第 %s 篇文章阅读完成，共下滑 %s 次！", readNum, hasNum));
-            appendFile(rootPath + "\\read.txt", url);
+            printLog(String.format("第 %s 篇文章阅读完成，共下滑 %s 次！", currentNum + 1, hasNum));
+            if (currentNum < totalNum - 1) {
+                currentNum = currentNum + 1;
+            } else {
+                currentNum = 0;
+            }
         }
 
         if (Objects.nonNull(driver)) {
@@ -444,41 +489,5 @@ public class Controller implements Initializable {
         } catch (Exception e) {
             appendFile(rootPath + "\\error.log", e.getMessage());
         }
-    }
-
-    /**
-     * 读取删除第一行
-     *
-     * @param pathname
-     * @return
-     */
-    private String readAndDeleteFirstLine(String pathname) {
-        String firstLine = null;
-        try {
-            BufferedReader br = new BufferedReader(new FileReader(pathname));
-            StringBuilder sb = new StringBuilder(4096);
-            String temp;
-            int line = 0;
-            while ((temp = br.readLine()) != null) {
-                line++;
-                if (line == 1) {
-                    firstLine = temp;
-                    continue;
-                }
-                sb.append(temp).append("\r\n");
-            }
-            br.close();
-            BufferedWriter bw = new BufferedWriter(new FileWriter(pathname));
-            bw.write(sb.toString());
-            bw.close();
-            if (line > 0) {
-                unReadNum = line - 1;
-            }
-        } catch (Exception e) {
-            printLog("获取文章失败！");
-            appendFile(rootPath + "\\error.log", e.getMessage());
-        }
-
-        return firstLine;
     }
 }
