@@ -29,7 +29,7 @@ public class Controller implements Initializable {
     private static final String rootPath;
     private static ExecutorService executorService;
     private static final List<String> userAgents;
-    private static List<String> urls;
+    private static List<String> urls = Lists.newArrayList();
     private static int totalNum = 0;//总文章篇数
     private ChromeDriver driver;
     private boolean stopReadFlag = false;

@@ -3,10 +3,7 @@ package com.hai;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.*;
-import java.util.Enumeration;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.net.SocketException;
 
 /**
  * class：ADSLUtil
@@ -14,8 +11,6 @@ import java.util.regex.Pattern;
  * author: haihui.zhang
  */
 public class ADSLUtil {
-    private static final String reg = "(127|10|172|192)\\.([0-1][0-9]{0,2}|[2][0-5]{0,2}|[3-9][0-9]{0,1})\\.([0-1][0-9]{0,2}|[2][0-5]{0,2}|[3-9][0-9]{0,1})\\.([0-1][0-9]{0,2}|[2][0-5]{0,2}|[3-9][0-9]{0,1})";
-
     /**
      * 执行CMD命令,并返回String字符串 
      *
@@ -82,22 +77,25 @@ public class ADSLUtil {
      * @return
      * @throws SocketException
      */
-    static String getIp() throws SocketException {
-        Enumeration<NetworkInterface> b = NetworkInterface.getNetworkInterfaces();
-        while (b.hasMoreElements()) {
-            for (InterfaceAddress f : b.nextElement().getInterfaceAddresses()) {
-                InetAddress inetAddress = f.getAddress();
-                if (inetAddress instanceof Inet4Address && !isInner(inetAddress.getHostAddress())) {
-                    return inetAddress.getHostAddress();
+    static String getIp() throws IOException, InterruptedException {
+        Process process = Runtime.getRuntime().exec("ipconfig");
+        process.waitFor();
+        BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        String line;
+        boolean start = false;
+        while ((line = br.readLine()) != null) {
+            if (line.contains("宽带连接")) {
+                start = true;
+                continue;
+            }
+            if (start) {
+                if (line.contains("IPv4 地址")) {
+                    String[] s = line.split(":");
+                    return s[1].trim();
                 }
             }
         }
-        return null;
-    }
 
-    private static boolean isInner(String ip) {
-        Pattern p = Pattern.compile(reg);
-        Matcher matcher = p.matcher(ip);
-        return matcher.find();
+        return null;
     }
 }
